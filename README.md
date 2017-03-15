@@ -40,8 +40,8 @@ YUV:
 acc for test set is:  0.984797297297
 
 YCrCb:
-5.14 Seconds to train SVC with YCrCb...
-acc for test set is:  0.993243243243
+10.33 Seconds to train SVC with YCrCb...
+acc for test set is:  0.995213963964
 
 HSV:
 5.8 Seconds to train SVC with HSV...
@@ -82,3 +82,35 @@ HLS:
 acc for test set is:  0.988457207207
 
 In looking at the accuracy, it seems like the feature/model to use is YCrCb with pix_per_cell = 8, cell_per_block = 2, orient = 9
+
+
+Sliding Window method
+--------------------------------------------
+Now that I have a classifer, I will need to be able to prediction where the vehicle is in the image. The technique that is used is called the sliding window. Basically, a window of a specific size will travel through the image, and each time it moves, we will use the model to classify if there is a car there or not. Below is a example of all the overlapping windows that this technique will use.
+
+<img width="530" alt="screen shot 2017-03-14 at 8 59 46 pm" src="https://cloud.githubusercontent.com/assets/22971963/23933069/33ebb298-08f9-11e7-9a15-71ddcb3b5e12.png">
+
+Then, using the combination of HOG features and the YCrCb colorspace, this is where the classifier think the car is located.
+
+<img width="532" alt="screen shot 2017-03-14 at 9 03 12 pm" src="https://cloud.githubusercontent.com/assets/22971963/23933126/a9f4b6b0-08f9-11e7-8b4f-9ca6cf18c9a9.png">
+
+and this is a pretty good estimation! However, realistically, we only want one bounding box for each of the car and therefore, more work has to be done.
+
+Heatmap method
+--------------------------------------------
+The next step to find one bounding box for each car and the technique to use is the heatmap method. The way this work is that for every pixel that is bounded with in the box, we will add 1 to the pixel. Here is the result image.
+
+<img width="523" alt="screen shot 2017-03-14 at 9 06 24 pm" src="https://cloud.githubusercontent.com/assets/22971963/23933245/62d56b98-08fa-11e7-8cb9-a8fd4bb8e967.png">
+
+and again, we can see that there are 2 blob in the image. However, now we can use that information and determine the max and min position of the individual blob. This max and min position is the bounding box of the car.
+
+<img width="531" alt="screen shot 2017-03-14 at 9 10 02 pm" src="https://cloud.githubusercontent.com/assets/22971963/23933296/c1aa8d10-08fa-11e7-95fa-bee278d81135.png">
+
+We can now see 2 individual box that is bounding the car. Even though this is not perfect but it does give a good estimation of where the car is located.
+
+With this we now have a pipeline to do car detection. However, this pipeline will be really slow because for every single image, the pipeline needs to go through 736 windows to extract features and make a prediction. 
+
+There are a few ways to help with this problem. First we can reduce the window numbers so that the pipeline doesn't need to extract features for 736 times and also we can use a technique called HOG subsampling. This technique basically only require the pipeline to take the HOG feature once for each image, and it is shown to be a big time saver.
+
+
+
