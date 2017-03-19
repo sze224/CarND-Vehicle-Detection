@@ -2,10 +2,11 @@
 
 In this project, the goal is to create a pipeline that can identify the the vehicles in the video.
 
-The pipeline that I ended up with broken down into the following sections:
+The pipeline that I ended up with can be broken down into the following sections:
 * Data Visualization
 * HOG features
 * Linear SVM
+* Video Pipeline
 
 Data Visualization
 --------------------------------------------
@@ -32,56 +33,56 @@ Now that I know which feature to use, I can begin training my model. The model t
 pix_per_cell = 8, cell_per_block = 2, orient = 9
 --------------------------------------------
 RGB: 
-20.89 Seconds to train SVC with RGB...
-acc for test set is:  0.973817567568
+15.26 Seconds to train SVC with RGB...
+acc for test set is:  0.970439189189
 
 YUV:
-5.26 Seconds to train SVC with YUV...
-acc for test set is:  0.984797297297
+4.36 Seconds to train SVC with YUV...
+acc for test set is:  0.990990990991
 
 YCrCb:
-10.33 Seconds to train SVC with YCrCb...
-acc for test set is:  0.995213963964
+5.02 Seconds to train SVC with YCrCb...
+acc for test set is:  0.991835585586
 
 HSV:
-5.8 Seconds to train SVC with HSV...
-acc for test set is:  0.987612612613
+6.02 Seconds to train SVC with HSV...
+acc for test set is:  0.987331081081
 
 LUV:
-6.11 Seconds to train SVC with LUV...
-acc for test set is:  0.989583333333
+4.78 Seconds to train SVC with LUV...
+acc for test set is:  0.987331081081
 
 HLS:
-6.65 Seconds to train SVC with HLS...
-acc for test set is:  0.984797297297
+6.03 Seconds to train SVC with HLS...
+acc for test set is:  0.986768018018
 
 pix_per_cell = 8, cell_per_block = 2, orient = 18
 --------------------------------------------
 RGB:
-23.31 Seconds to train SVC with RGB...
-acc for test set is:  0.97606981982
+24.82 Seconds to train SVC with RGB...
+acc for test set is:  0.973536036036
 
 YUV:
-11.71 Seconds to train SVC with YUV...
-acc for test set is:  0.99268018018
+7.88 Seconds to train SVC with YUV...
+acc for test set is:  0.990990990991
 
 YCrCb
-9.94 Seconds to train SVC with YCrCb...
-acc for test set is:  0.99268018018
+9.48 Seconds to train SVC with YCrCb...
+acc for test set is:  0.991554054054
 
 HSV:
-8.91 Seconds to train SVC with HSV...
+13.29 Seconds to train SVC with HSV...
 acc for test set is:  0.990146396396
 
 LUV:
-8.81 Seconds to train SVC with LUV...
-acc for test set is:  0.990709459459
+8.55 Seconds to train SVC with LUV...
+acc for test set is:  0.990990990991
 
 HLS:
-9.81 Seconds to train SVC with HLS...
-acc for test set is:  0.988457207207
+9.6 Seconds to train SVC with HLS...
+acc for test set is:  0.986768018018
 
-In looking at the accuracy, it seems like the feature/model to use is YCrCb with pix_per_cell = 8, cell_per_block = 2, orient = 9
+In looking at the accuracy and the time to train the model, it seems like the feature/model to use is YCrCb with pix_per_cell = 8, cell_per_block = 2, orient = 9 give the best result. This will be the classifer that I will be using for the project.
 
 
 Sliding Window method
@@ -111,6 +112,53 @@ We can now see 2 individual box that is bounding the car. Even though this is no
 With this we now have a pipeline to do car detection. However, this pipeline will be really slow because for every single image, the pipeline needs to go through 736 windows to extract features and make a prediction. 
 
 There are a few ways to help with this problem. First we can reduce the window numbers so that the pipeline doesn't need to extract features for 736 times and also we can use a technique called HOG subsampling. This technique basically only require the pipeline to take the HOG feature once for each image, and it is shown to be a big time saver.
+
+In many cases, there will be some false positive, this is where the model will return that there is a car when there are only lane markings. Here is an example below.
+
+<img width="473" alt="screen shot 2017-03-19 at 12 54 10 am" src="https://cloud.githubusercontent.com/assets/22971963/24079141/9e1d3518-0c3e-11e7-9c63-e12e3ef48f5f.png">
+
+<img width="470" alt="screen shot 2017-03-19 at 12 55 45 am" src="https://cloud.githubusercontent.com/assets/22971963/24079157/d63e99b4-0c3e-11e7-8cc5-a028aa6f2c22.png">
+
+It can be seen that, there is a bounding box in there image even though there is no car in the image. TO help solve this problem, this is where the heatmap can be a useful tool. Since the heatmap can show the intensity for the pixel, we can basically set a threshold to the heatmap and eliminate all the pixel that is under a specific value to be zero. This way, we can eliminate the area where we have have no confidence that it is a car (false positive) while keeping the area where we have a high confidence that it is a car.
+
+By setting the threshold to 3, we can see that the false positive is no longer an issue in that image.
+
+<img width="463" alt="screen shot 2017-03-19 at 1 02 51 am" src="https://cloud.githubusercontent.com/assets/22971963/24079210/e5271a54-0c3f-11e7-807f-f1a1c1f821e0.png">
+
+Video Pipeline
+--------------------------------------------
+Now that I have all the tools needed to identify the potential position of the car (sliding windows) and a way to eliminate the false positive. I can now create a pipeline to detect vehicles in the video stream. 
+
+Here some of the features/approach that I took:
+
+First, running a full scan of the image and use the HOG subsampling technique to find the bounding box of the where the car is. Once I do that, I can use that information to narrow down the search area when I search in the next frame. Instead of a full scan on the whole image, the next scan will be focused on where the bounding box was found in the previous frame. There are two benefits that came with this methods. 
+
+1) With a narrower search, the chances of getting false positive will decrease
+2) Lower runtime (since runtime is lower, the overlapping for this type of search is 1 pix per step instead of 2 or 4 pix per step)
+
+Then, after every 8 frames of subimage scan, a full image scan will be performed in case if any new cars are coming into the image. 
+
+During these 8 frames, the resulting heatmap will be recorded and summed together. Basically, adding the heatmap together will give up a higher confidence in where the car is located. By setting another threshold, false negative can be again eliminated.
+
+If in any case, where we detected a car for a one frame and lose it for the next, I will keep the bounding box the same as the previous bound just in case that this is a misdetection due to lighting change or a poor model output. 
+
+Reflection
+--------------------------------------------
+There are still many things that I would like to improve in this pipeline. 
+
+For instance, sometime, depending on the threshold that I set for the heatmap, the heatmap will return 2 separate blobs even though both blobs should be the same car. I would like to implemente a way to dilate the image where it will connect blobs that are close enough to each other. 
+
+Additionally, I would like to find the centroid of the bounding box and record the movement from frame to frame, this way, I can tell how fast and also the position that the other cars is going in respect of me.
+
+This is a really great and challenging project that allow us to truly understand how tough the detection problem is. Although this is one of the older technique, but it definitely allowed me to put everything into prespective. This made me want to study more on how the state-of-the-art technique works (such as YOLO).
+
+Here is the result using the pipeline for the project video:
+https://youtu.be/I9tk11dycCw
+
+
+
+
+
 
 
 
